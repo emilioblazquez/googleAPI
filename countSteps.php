@@ -1,5 +1,5 @@
 <?php
-require __DIR__ . '/vendor/autoload.php';
+require '/home/emilio/repo/perseed_platform/library/init_autoloader.php';
 
 define('APPLICATION_NAME', 'Google FIT API PHP Quickstart');
 define('CREDENTIALS_PATH', '~/.credentials/google-fit-php-quickstart.json');
@@ -74,30 +74,38 @@ $fitness_service = new Google_Service_Fitness($client);
 $dataSources = $fitness_service->users_dataSources;
 $dataSets = $fitness_service->users_dataSources_datasets;
 $listDataSources = $dataSources->listUsersDataSources("me");
+$start = $end = null;
 
-$start = date('Y-m-d H:i:s');
-$end = date('Y-m-d ' . '00:00:00');
+if (count($argv) === 3) {
+    $start = $argv[1];
+    $end = $argv[2];
+}
 
-$startTime = strtotime($start);
-$endTime = strtotime($end);
+$dates = array();
 
-while($listDataSources->valid()) {
-    $dataSourceItem = $listDataSources->next();
-    if ($dataSourceItem['dataStreamId'] == "derived:com.google.step_count.delta:com.google.android.gms:estimated_steps") {
-        $dataStreamId = $dataSourceItem['dataStreamId'];
-        $listDatasets = $dataSets->get("me", $dataStreamId, $startTime.'000000000'.'-'.$endTime.'000000000');
-        $step_count = 0;
-        while($listDatasets->valid()) {
-            $dataSet = $listDatasets->next();
-            $dataSetValues = $dataSet['value'];
-            if ($dataSetValues && is_array($dataSetValues)) {
-                foreach($dataSetValues as $dataSetValue) {
-                    $step_count += $dataSetValue['intVal'];
+// Loop over days
+while (strtotime($start) <= strtotime($end)) {
+    $startTime = strtotime($start . ' 00:00:00');
+    $endTime = strtotime($start . ' 23:59:59');
+    while($listDataSources->valid()) {
+        $dataSourceItem = $listDataSources->next();
+        if ($dataSourceItem['dataStreamId'] == "derived:com.google.step_count.delta:com.google.android.gms:estimated_steps") {
+            $dataStreamId = $dataSourceItem['dataStreamId'];
+            $listDatasets = $dataSets->get("me", $dataStreamId, $startTime.'000000000'.'-'.$endTime.'000000000');
+            $step_count = 0;
+            while($listDatasets->valid()) {
+                $dataSet = $listDatasets->next();
+                $dataSetValues = $dataSet['value'];
+                if ($dataSetValues && is_array($dataSetValues)) {
+                    foreach($dataSetValues as $dataSetValue) {
+                        $step_count += $dataSetValue['intVal'];
+                    }
                 }
             }
-        }
-        var_dump("Start Time: " . $start);
-        var_dump("End time: " . $end);
-        var_dump("Total steps: " . $step_count);
-    };
+        };
+    }
+    $dates[$start] = $step_count;
+    $start = date ("Y-m-d", strtotime("+1 days", strtotime($start)));
+    $listDataSources = $dataSources->listUsersDataSources("me");
 }
+var_dump($dates);
