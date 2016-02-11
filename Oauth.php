@@ -3,8 +3,12 @@ require '/home/emilio/repo/perseed_platform/library/init_autoloader.php';
 
 define('APPLICATION_NAME', 'Google FIT API PHP Quickstart');
 define('CLIENT_SECRET_PATH', '/home/emilio/repo/googleAPI/client_secret.json');
-define('CREDENTIALS', '/home/emilio/.credentials.json');
 define('SCOPES', implode(' ', array(Google_Service_Fitness::FITNESS_ACTIVITY_READ)));
+
+$client = new Google_Client();
+$client->setAuthConfigFile(CLIENT_SECRET_PATH);
+$client->addScope(Google_Service_Fitness::FITNESS_ACTIVITY_READ);
+$client->addScope(Google_Service_Fitness::FITNESS_BODY_READ);
 
 setcookie('start', date('Y-m-d'));
 setcookie('end', date('Y-m-d'));
@@ -14,37 +18,21 @@ if (isset($_GET['start']))
 if (isset($_GET['end']))
     setcookie('end', $_GET['end']);
 
-
-$client = new Google_Client();
-$client->setAuthConfigFile(CLIENT_SECRET_PATH);
-$client->addScope(Google_Service_Fitness::FITNESS_ACTIVITY_READ);
-$client->addScope(Google_Service_Fitness::FITNESS_BODY_READ);
-$client->setAccessType('offline');
-
-// Check file or database
-if (file_exists($credentialsPath)) {
-    $accessToken = file_get_contents(CREDENTIALS);
-} else {
-    // If code is set, store it into file or db
-    if (isset($_GET['code'])) {
-        $client->authenticate($_GET['code']);
-        $accessToken = $client->getAccessToken();
-        file_put_contents(CREDENTIALS, $accessToken);
-    }
-
-    if (!$client->getAccessToken()) {
-        $authUrl = $client->createAuthUrl();
-    }
+// We received the positive auth callback, get the token and store it in session
+if (isset($_GET['code'])) {
+    $client->authenticate($_GET['code']);
+    $_SESSION['token'] = $client->getAccessToken();
 }
 
-$client->setAccessToken($accessToken);
-
-// Refresh the token if it's expired.
-if ($client->isAccessTokenExpired()) {
-  $client->refreshToken($client->getRefreshToken());
-  file_put_contents(CREDENTIALS, $client->getAccessToken());
+// Extract Token from session and configure client
+if (isset($_SESSION['token'])) {
+    $token = $_SESSION['token'];
+    $client->setAccessToken($token);
 }
 
+if (!$client->getAccessToken()) {
+    $authUrl = $client->createAuthUrl();
+}
 
 // If user is not set, display login button
 if (isset($authUrl))
